@@ -1,0 +1,95 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="pouchdb-import.html">
+
+<!--
+The pouchdb-replicate element is a wrapper for the replicate method of PouchDB.
+
+Example:
+
+    <pouchdb-replicate
+      source="http://localhost:4984/db"
+      target="local">
+    </pouchdb-replicate>
+
+@group PouchDB Element
+@element pouchdb-replicate
+@demo demo/index.html
+@hero hero.svg
+-->
+
+<dom-module id="pouchdb-replicate">
+  <script>
+    Polymer({
+      is: 'pouchdb-replicate',
+
+      properties: {
+        source: String,
+        target: String,
+        lastError: {
+          type: String,
+          readOnly: true,
+          notify: true
+        },
+        denied: {
+          type: String,
+          readOnly: true,
+          notify: true
+        }
+      },
+
+      ready: function() {
+        this.replicate();
+      },
+
+      /**
+       * Start replication
+       */
+      replicate: function() {
+        if (!this.source || !this.target) {
+          this._setLastError('source and target Attribute need to be set.');
+        } else {
+          this.replication = PouchDB.replicate(this.source, this.target, {
+            since: 0,
+            live: true,
+            retry: true
+          }).on('change', function (info) {
+            // handle change
+          }).on('paused', function () {
+            // replication paused (e.g. user went offline)
+          }).on('active', function () {
+            // replicate resumed (e.g. user went back online)
+          }).on('denied', function (info) {
+            // a document failed to replicate, e.g. due to permissions
+            this._setDenied(info);
+          }).on('complete', function (info) {
+            // handle complete
+          }).on('error', function (err) {
+            this._setLastError(err);
+          });
+        }
+      },
+
+      /**
+       * Cancel replication
+       */
+      cancel: function() {
+        this.replication.cancel();
+      },
+
+      /**
+       * Cancel replication and destroy the target database.
+       */
+      destroy: function() {
+        if (this.replication) {
+          this.replication.cancel();
+        }
+        var db = new PouchDB(this.target);
+        db.destroy().then(function (response) {
+          // success
+        }).catch(function (err) {
+          this._setLastError(err);
+        });
+      }
+    });
+  </script>
+</dom-module>

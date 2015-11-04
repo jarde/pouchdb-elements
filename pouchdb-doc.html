@@ -1,0 +1,65 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="pouchdb-import.html">
+
+<!--
+The pouchdb-docs element is a wrapper for the allDocs method of PouchDB.
+Addiotionally this element use the changes method of PouchDB.
+
+Example:
+
+    <pouchdb-doc
+      source="dbname"
+      byId="some_doc_id"
+    </pouchdb-doc>
+
+@group PouchDB Element
+@element pouchdb-doc
+@demo demo/index.html
+@hero hero.svg
+-->
+
+<dom-module id="pouchdb-doc">
+  <script>
+    Polymer({
+      is: 'pouchdb-doc',
+
+      properties: {
+        source: String,
+        byId: String,
+        doc: {
+          type: Object,
+          value: {},
+          notify: true
+        },
+        lastError: {
+          type: String,
+          value: '',
+          readOnly: true,
+          notify: true
+        }
+      },
+
+      observers: [
+        '_start(source, byId)'
+      ],
+
+      /**
+       * fetch document by id
+       */
+      _start: function(source, byId) {
+        // set options for get
+        var options = {attachments: true};
+
+        var self = this;
+        // connect to the db
+        self.db = new PouchDB(self.source);
+        // get the document
+        self.db.get(self.byId, options).then(function (doc) {
+          self.doc = doc;
+        }).catch(function (err) {
+          self._setLastError(err.message || 'unknown error');
+        });
+      }
+    });
+  </script>
+</dom-module>

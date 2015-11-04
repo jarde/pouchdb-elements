@@ -1,0 +1,128 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../web-component-tester/browser.js"></script>
+
+    <!-- Step 1: import the element to test -->
+    <link rel="import" href="../pouchdb-elements.html">
+    <link rel="import" href="../pouchdb-import.html">
+  </head>
+  <body>
+
+    <!-- You can use the document as a place to set up your fixtures.-->
+    <pouchdb-replicate source="dbSource" target="dbTarget"></pouchdb-replicate>
+
+    <script>
+      var source = new PouchDB('dbSource');
+      var target = new PouchDB('dbTarget');
+      var pouchdbReplicate = document.querySelector('pouchdb-replicate');
+
+      // create some dummy documents in the database
+      var dummyDocs = [
+        {_id : 'doc01', name : '1'},  {_id : 'doc02', name : '2'},
+        {_id : 'doc03', name : '3'},  {_id : 'doc04', name : '4'},
+        {_id : 'doc05', name : '5'},  {_id : 'doc06', name : '6'},
+        {_id : 'doc07', name : '7'},  {_id : 'doc08', name : '8'},
+        {_id : 'doc09', name : '9'},  {_id : 'doc10', name : '10'},
+        {_id : 'doc11', name : '11'}, {_id : 'doc12', name : '12'},
+        {_id : 'doc13', name : '13'}, {_id : 'doc14', name : '14'},
+        {_id : 'doc15', name : '15'}, {_id : 'doc16', name : '16'},
+        {_id : 'doc17', name : '17'}, {_id : 'doc18', name : '18'},
+        {_id : 'doc19', name : '19'}, {_id : 'doc20', name : '20'},
+      ];
+
+      suiteSetup(function(done) {
+        source.bulkDocs({docs : dummyDocs}, function (err, response) {
+          // wait some time to let replication run.
+          setTimeout(function() {
+            done();
+          }, 8000);
+        });
+      });
+
+      suite('<pouchdb-replicate>', function() {
+        test('Source db has all elements.', function (done) {
+          source.allDocs({
+            include_docs: true,
+            attachments: true
+          }).then(function (result) {
+            assert.lengthOf(result.rows, dummyDocs.length);
+            done();
+          });
+        });
+
+        test('Target db has all elements.', function (done) {
+          target.allDocs({
+            include_docs: true,
+            attachments: true
+          }).then(function (result) {
+            assert.isUndefined(pouchdbReplicate.lastError);
+            assert.isUndefined(pouchdbReplicate.denied);
+            console.log(JSON.stringify(result));
+            assert.lengthOf(result.rows, dummyDocs.length);
+            done();
+          });
+        });
+
+        test('Test document change detection for create', function (done) {
+          source.put({'_id' : 'doc21'}, function (err, response) {
+            // wait some time to be sure that replication finished
+            setTimeout(function() {
+              target.allDocs({
+                include_docs: true,
+                attachments: true
+              }).then(function (result) {
+                assert.isUndefined(pouchdbReplicate.lastError);
+                assert.isUndefined(pouchdbReplicate.denied);
+                assert.lengthOf(result.rows, dummyDocs.length + 1);
+                done();
+              });
+            }, 2000);
+          });
+        });
+
+        test('Test document change detection for update', function (done) {
+          source.get('doc21').then(function(doc) {
+            doc.name = 'updated';
+            return source.put(doc);
+          }).then(function (result) {
+            // wait some time to be sure that replication finished
+            setTimeout(function() {
+              target.get('doc21').then(function(doc) {
+                assert.equal('updated', doc.name, 'Update reflected');
+                assert.isUndefined(pouchdbReplicate.lastError);
+                assert.isUndefined(pouchdbReplicate.denied);
+                done();
+              });
+            }, 2000);
+          });
+        });
+
+        test('Test document change detection for remove', function (done) {
+          source.get('doc21').then(function(doc) {
+            return source.remove(doc);
+          }).then(function (result) {
+            // wait some time to be sure that replication finished
+            setTimeout(function() {
+              target.allDocs({
+                include_docs: true,
+                attachments: true
+              }).then(function (result) {
+                assert.isUndefined(pouchdbReplicate.lastError);
+                assert.isUndefined(pouchdbReplicate.denied);
+                assert.lengthOf(result.rows, dummyDocs.length);
+                done();
+              });
+            }, 2000);
+          });
+        });
+
+      });
+    </script>
+
+  </body>
+</html>

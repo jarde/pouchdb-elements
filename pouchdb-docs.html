@@ -1,0 +1,144 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="pouchdb-import.html">
+
+<!--
+The pouchdb-docs element is a wrapper for the allDocs method of PouchDB.
+Addiotionally this element use the changes method of PouchDB.
+
+Example:
+
+    <pouchdb-docs
+      source="dbname"
+      startkey="foo"
+      endkey="foo\uffff"
+      docs={{list}}>
+    </pouchdb-docs>
+
+@group PouchDB Element
+@element pouchdb-docs
+@demo demo/index.html
+@hero hero.svg
+-->
+
+<dom-module id="pouchdb-docs">
+  <script>
+    Polymer({
+      is: 'pouchdb-docs',
+
+      properties: {
+        source: String,
+        startkey: String,
+        endkey: String,
+        docs: {
+          type: Array,
+          value: function() {
+            return [];
+          },
+          notify: true
+        },
+        lastError: {
+          type: String,
+          readOnly: true,
+          readOnly: true,
+          notify: true
+        }
+      },
+
+      observers: [
+        '_start(source, startkey, endkey)'
+      ],
+
+      _start: function(source, startkey, endkey) {
+        this.refresh();
+      },
+
+      refresh: function() {
+        var self = this;
+        // if we are already loading data
+        if (self.loading) return false;
+        // set flag
+        self.loading = true;
+        // we need to remove all docs first.
+        self.splice('docs', 0, self.docs.length);
+        // enable change feed
+        self._startChangesFeed();
+        // load all docs
+        self._loadAllDocs();
+
+        return true;
+      },
+
+      /**
+       * fetch all docs
+       */
+      _loadAllDocs: function() {
+        var self = this;
+
+        // get all docs
+        self.db.allDocs({
+          include_docs: true,
+          attachments: true,
+          startkey: self.startkey,
+          endkey: self.endkey
+        }).then(function (result) {
+          for (var i = 0; i < result.rows.length; i++) {
+            self.push('docs', result.rows[i].doc);
+          }
+          self.loading = false;
+        }).catch(function (err) {
+          self._setLastError(err.message || 'unknown error');
+          self.loading = false;
+        });
+      },
+
+      /**
+       * Start change feed
+       */
+      _startChangesFeed: function(newValue, oldValue) {
+        var self = this;
+        // connect to the db
+        self.db = new PouchDB(self.source);
+        // cancel active changes feed
+        if (self.changes) {
+          self.changes.cancel();
+        }
+        // listen to db changes.
+        self.changes = self.db.changes({
+          since: 'now',
+          live: true,
+          include_docs: true
+        }).on('change', function(change) {
+          self._updateSingleDoc(change.doc);
+        }).on('complete', function(info) {
+          // changes() was canceled
+        }).on('error', function (err) {
+          self._setLastError(err.message || 'unknown error');
+        });
+      },
+
+      /**
+       * Update the Array of documents with the provided doc
+       */
+      _updateSingleDoc: function(doc) {
+        var self = this;
+        // run through all docs and find the doc which to update.
+        for (var i = 0; i < self.docs.length; i++) {
+          if (self.docs[i]._id === doc._id) {
+            if (doc._deleted) {
+              self.splice('docs', i, 1);
+            } else {
+              self.set('docs.' + i, doc);
+            }
+            return true;
+          }
+        }
+        // end of all docs reached. The doc need to be inserted
+        if ( doc._id >= self.startkey && doc._id <= self.endkey) {
+          self.push('docs', doc);
+          return true;
+        }
+        return false;
+      }
+    });
+  </script>
+</dom-module>

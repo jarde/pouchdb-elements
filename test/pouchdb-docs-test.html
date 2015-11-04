@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../web-component-tester/browser.js"></script>
+
+    <!-- Step 1: import the element to test -->
+    <link rel="import" href="../pouchdb-elements.html">
+    <link rel="import" href="../pouchdb-import.html">
+  </head>
+  <body>
+
+    <!-- You can use the document as a place to set up your fixtures. -->
+    <pouchdb-docs></pouchdb-docs>
+
+    <script>
+      var name = 'db';
+      var pouchdbDocs = document.querySelector('pouchdb-docs');
+      var db = new PouchDB(name);
+
+      // create some dummy documents in the database
+      var dummyDocs = [
+        {_id : 'doc01', name : '1'},  {_id : 'doc02', name : '2'},
+        {_id : 'doc03', name : '3'},  {_id : 'doc04', name : '4'},
+        {_id : 'doc05', name : '5'},  {_id : 'doc06', name : '6'},
+        {_id : 'doc07', name : '7'},  {_id : 'doc08', name : '8'},
+        {_id : 'doc09', name : '9'},  {_id : 'doc10', name : '10'},
+        {_id : 'doc11', name : '11'}, {_id : 'doc12', name : '12'},
+        {_id : 'doc13', name : '13'}, {_id : 'doc14', name : '14'},
+        {_id : 'doc15', name : '15'}, {_id : 'doc16', name : '16'},
+        {_id : 'doc17', name : '17'}, {_id : 'doc18', name : '18'},
+        {_id : 'doc19', name : '19'}, {_id : 'doc20', name : '20'},
+      ];
+
+      suiteSetup(function(done) {
+        db.bulkDocs({docs : dummyDocs}, function (err, response) {
+          done();
+        });
+      });
+
+      suite('<pouchdb-docs>', function() {
+        test('Docs are setup', function (done) {
+          db.allDocs({
+            include_docs: true,
+            attachments: true
+          }).then(function (result) {
+            assert.lengthOf(result.rows, dummyDocs.length);
+            done();
+          }).catch(function (err) {
+            throw new Error(err);
+          });
+        });
+
+
+        test('Initial values', function() {
+          assert.lengthOf(pouchdbDocs.docs, 0, 'doc should be empty');
+        });
+        test('Connect to db and readout all docs', function(done) {
+          pouchdbDocs.source = name;
+          pouchdbDocs.refresh();
+          // check after a timeout, to be sure that data was fetched
+          setTimeout(function() {
+            assert.isUndefined(pouchdbDocs.lastError);
+            assert.lengthOf(pouchdbDocs.docs, dummyDocs.length, 'Check if all docs get readout');
+            done();
+          }, 2000);
+        });
+
+        test('Connect to db with startkey and endkey limitation', function(done) {
+          pouchdbDocs.source = name;
+          pouchdbDocs.startkey = 'doc11';
+          pouchdbDocs.endkey = 'doc20';
+          pouchdbDocs.refresh();
+          // check after a timeout, to be sure that data was fetched
+          setTimeout(function() {
+            assert.isUndefined(pouchdbDocs.lastError);
+            assert.lengthOf(pouchdbDocs.docs, 10, 'Check if all docs get readout');
+            done();
+          }, 2000);
+        });
+
+        test('Test document change detection for create', function(done) {
+          pouchdbDocs.source = name;
+          pouchdbDocs.startkey = 'doc01';
+          pouchdbDocs.endkey = 'doc30';
+          pouchdbDocs.refresh();
+          setTimeout(function() {
+            db.put({'_id' : 'doc21'}, function (err, response) {
+              // check after a timeout, to be sure that data was fetched
+              setTimeout(function() {
+                assert.isUndefined(pouchdbDocs.lastError);
+                assert.lengthOf(pouchdbDocs.docs, dummyDocs.length + 1, 'Check if all docs get readout');
+                done();
+              }, 2000);
+            });
+          }, 2000);
+        });
+
+        test('Test document change detection for update', function(done) {
+          pouchdbDocs.source = name;
+          pouchdbDocs.startkey = 'doc01';
+          pouchdbDocs.endkey = 'doc30';
+          pouchdbDocs.refresh();
+          setTimeout(function() {
+            db.get('doc21').then(function(doc) {
+              doc.name = 'updated';
+              return db.post(doc);
+            }).then(function (result) {
+              // check after a timeout, to be sure that data was fetched
+              setTimeout(function() {
+                assert.isUndefined(pouchdbDocs.lastError);
+                assert.lengthOf(pouchdbDocs.docs, dummyDocs.length + 1, 'Check if all docs get readout');
+                for (var i = 0; i < pouchdbDocs.docs.length; i++) {
+                  if (pouchdbDocs.docs[i]._id === 'doc21') {
+                    assert.equal('updated', pouchdbDocs.docs[i].name, 'Update reflected');
+                    done();
+                    return;
+                  }
+                }
+                done();
+                throw Error('Update not reflected');
+              }, 2000);
+            });
+          }, 2000);
+        });
+
+        test('Test document change detection for remove', function(done) {
+          pouchdbDocs.source = name;
+          pouchdbDocs.startkey = 'doc01';
+          pouchdbDocs.endkey = 'doc30';
+          pouchdbDocs.refresh();
+          setTimeout(function() {
+            db.get('doc21').then(function(doc) {
+              doc.name = 'updated';
+              return db.remove(doc);
+            }).then(function (result) {
+              // check after a timeout, to be sure that data was fetched
+              setTimeout(function() {
+                assert.isUndefined(pouchdbDocs.lastError);
+                assert.lengthOf(pouchdbDocs.docs, dummyDocs.length, 'Check if all docs get readout');
+                for (var i = 0; i < pouchdbDocs.docs.length; i++) {
+                  if (pouchdbDocs.docs[i]._id === 'doc21') {
+                    throw Error('Remove not reflected');
+                  }
+                }
+                done();
+              }, 2000);
+            });
+          }, 2000);
+        });
+      });
+    </script>
+
+  </body>
+</html>

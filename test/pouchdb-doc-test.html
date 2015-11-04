@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+
+    <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+    <script src="../../web-component-tester/browser.js"></script>
+
+    <!-- Step 1: import the element to test -->
+    <link rel="import" href="../pouchdb-elements.html">
+    <link rel="import" href="../pouchdb-import.html">
+  </head>
+  <body>
+
+    <!-- You can use the document as a place to set up your fixtures. -->
+    <pouchdb-doc></pouchdb-doc>
+
+    <script>
+      var name = 'db';
+      var pouchdbDoc = document.querySelector('pouchdb-doc');
+      var db = new PouchDB(name);
+      var validDoc = 'doc01';
+      var invalidDoc = 'XX';
+
+      // create some dummy documents in the database
+      var dummyDocs = [
+        {_id : 'doc01', name : '1'},  {_id : 'doc02', name : '2'}
+      ];
+
+      suiteSetup(function(done) {
+        db.bulkDocs({docs : dummyDocs}, function (err, response) {
+          done();
+        });
+      });
+
+      suite('<pouchdb-doc>', function() {
+        test('Docs are setup', function (done) {
+          db.allDocs({
+            include_docs: true,
+            attachments: true
+          }).then(function (result) {
+            assert.lengthOf(result.rows, dummyDocs.length);
+            done();
+          }).catch(function (err) {
+            throw new Error(err);
+          });
+        });
+
+        test('Test valid doc', function() {
+          pouchdbDoc.source = name;
+          pouchdbDoc.id = validDoc;
+          // wait until document was set.
+          setTimeout(function () {
+            assert.isUndefined(pouchdbDoc.lastError);
+            assert.equal(pouchdbDoc.doc, validDoc);
+          }, 2000);
+        });
+
+        test('Test unknwon doc', function() {
+          pouchdbDoc.source = name;
+          pouchdbDoc.id = invalidDoc;
+          // wait until document was set.
+          setTimeout(function () {
+            assert.isString(pouchdbDoc.lastError);
+          }, 2000);
+        });
+
+      });
+    </script>
+
+  </body>
+</html>
