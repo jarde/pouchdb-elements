@@ -59,6 +59,24 @@ Example:
         }).catch(function (err) {
           self._setLastError(err.message || 'unknown error');
         });
+
+        if (self.changes) {
+          self.changes.cancel();
+        }
+
+        self.changes = self.db.changes({
+          since: 'now',
+          live: true,
+          include_docs: true,
+          attachments: true,
+          doc_ids: [self.byId]
+        }).on('change', function(change) {
+          if (change.doc) {
+            self.doc = change.doc;
+          }
+        }).on('error', function (err) {
+          self._setLastError(err.message || 'unknown error');
+        });
       }
     });
   </script>
