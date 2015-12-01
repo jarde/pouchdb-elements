@@ -25,6 +25,13 @@ Example:
       properties: {
         source: String,
         target: String,
+        options: {
+          type: Object
+        },
+        auto: {
+          type: Boolean,
+          value: false
+        },
         lastError: {
           type: String,
           readOnly: true,
@@ -33,38 +40,63 @@ Example:
         denied: {
           type: String,
           readOnly: true,
+          readOnly: true,
           notify: true
-        }
+        },
+        active: {
+          type: Boolean,
+          readOnly: true,
+          value: false,
+          notify: true
+        },
+        paused: {
+          type: Boolean,
+          readOnly: true,
+          value: false,
+          notify: true
+        },
+        complete: {
+          type: Boolean,
+          readOnly: true,
+          value: false,
+          notify: true
+        },
       },
 
-      ready: function() {
-        this.replicate();
+      attached: function() {
+        if (this.auto) {
+          this.replicate();
+        }
       },
 
       /**
        * Start replication
        */
       replicate: function() {
-        if (!this.source || !this.target) {
-          this._setLastError('source and target Attribute need to be set.');
+        console.log('hier');
+        var self = this;
+        if (!self.source || !self.target) {
+          self._setLastError('source and target Attribute need to be set.');
         } else {
-          this.replication = PouchDB.replicate(this.source, this.target, {
+          self.replication = PouchDB.replicate(self.source, self.target, self.options, {
             since: 0,
             live: true,
             retry: true
-          }).on('change', function (info) {
-            // handle change
+          }).on('change', function () {
+            // replicated document
           }).on('paused', function () {
             // replication paused (e.g. user went offline)
+            self._setPaused(true);
           }).on('active', function () {
             // replicate resumed (e.g. user went back online)
+            self._setActive(true);
           }).on('denied', function (info) {
             // a document failed to replicate, e.g. due to permissions
-            this._setDenied(info);
-          }).on('complete', function (info) {
-            // handle complete
+            self._setDenied(info.message || 'denied');
+          }).on('complete', function () {
+            self._setComplete(true);
           }).on('error', function (err) {
-            this._setLastError(err);
+            self._setLastError(err.message || 'unknown error');
           });
         }
       },
@@ -80,14 +112,17 @@ Example:
        * Cancel replication and destroy the target database.
        */
       destroy: function() {
-        if (this.replication) {
-          this.replication.cancel();
-        }
-        var db = new PouchDB(this.target);
-        db.destroy().then(function (response) {
-          // success
-        }).catch(function (err) {
-          this._setLastError(err);
+        var self = this;
+        return new Promise(function(resolve, reject) {
+          if (self.replication) {
+            self.replication.cancel();
+          }
+          var db = new PouchDB(self.target);
+          db.destroy().then(function (response) {
+            resolve();
+          }).catch(function (err) {
+            reject(err.message || 'unknown error');
+          });
         });
       }
     });
