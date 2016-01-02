@@ -1,0 +1,64 @@
+<link rel="import" href="../polymer/polymer.html">
+<link rel="import" href="pouchdb-import.html">
+
+<!--
+The pouchdb-changes element is a wrapper for the changes method of PouchDB.
+
+Example:
+
+    <pouchdb-changes
+      source="http://localhost:4984/db">
+    </pouchdb-changes>
+
+@group PouchDB Element
+@element pouchdb-changes
+@demo demo/index.html
+@hero hero.svg
+-->
+
+<dom-module id="pouchdb-changes">
+  <script>
+    Polymer({
+      is: 'pouchdb-changes',
+
+      properties: {
+        source: String,
+        options: {
+          type: Object,
+          value: function() {
+            return {
+              live: true,
+              include_docs: true,
+              attachments: false,
+              since: 'now'
+            }
+          }
+        }
+      },
+
+      ready: function() {
+        this._changes();
+      },
+
+      detached: function() {
+        this.cancel();
+      },
+
+      /**
+       * Start change feed
+       */
+      _changes: function() {
+        var self = this;
+        self.db = new PouchDB(self.source);
+        self.changes = self.db.changes(self.options)
+        .on('change', function(change) {
+          self.fire('change', change.doc);
+        }).on('complete', function(info) {
+          self.fire('complete', info);
+        }).on('error', function (err) {
+          self.fire('error', err);
+        });
+      }
+    });
+  </script>
+</dom-module>
